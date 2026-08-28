@@ -121,6 +121,46 @@ function normalizeFeedbackText(v){return String(v??'').normalize('NFKC').toLower
 
 function safeLocalStorage(){try{const k='__seemind_lab_probe__';localStorage.setItem(k,'1');localStorage.removeItem(k);return localStorage}catch{return null}}
 
+async function buildApprovedVisualProviders() {
+  const item = modelManager.get('general-vision-detr');
+  
+  // 始终启用 General Vision，让 TransformersDetrProvider 内部处理下载
+  return createDefaultVisualProviders({
+    enableGeneralVision: true,
+    detrOptions: {
+      modelDeliveryManager: modelManager.deliveryManager,
+      modelManifest: item?.manifest || null,
+      offlineOnly: globalThis.navigator?.onLine === false,
+      modelStorageBudgetBytes: Math.max(item?.estimatedDownloadBytes * 1.2 || 64 * 1024 * 1024, 64 * 1024 * 1024),
+      onModelProgress: (e) => {
+        if (e?.type === 'model_file_progress' && e.total) {
+          const pct = Math.min(100, Math.round(e.loaded / e.total * 100));
+          const statusEl = document.querySelector('#status');
+          if (statusEl) {
+            statusEl.textContent = `正在准备视觉模型：${pct}%`;
+          }
+        }
+        if (e?.type === 'model_load_complete') {
+          const statusEl = document.querySelector('#status');
+          if (statusEl) {
+            statusEl.textContent = '视觉模型已准备就绪';
+          }
+          const fileInput = document.querySelector('#file');
+          if (fileInput?.files?.length) {
+            showNotice('视觉模型已准备，正在重新识别...');
+            setTimeout(() => {
+              fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+            }, 500);
+          }
+        }
+        if (e?.type === 'model_load_failed') {
+          showNotice(e.message || '视觉模型加载失败，将使用基础视觉能力');
+        }
+      },
+      loadTimeoutMs: 60000,
+    },
+  });
+}
 
 const capabilityExecutors=createWebCapabilityExecutors({
   getTaskPackage:()=>currentPackage,
@@ -447,4 +487,159 @@ function humanizeError(e) {
   // 只检查已知的错误代码，不依赖消息文本
   const code = e?.code || e?.name || '';
   if (code === 'PERCEPTION_ABORTED' || code === 'IMAGE_DECODE_ABORTED') return '操作已取消。';
-  if (code
+  if (code === 'OCR_ENGINE_UNAVAILABLE' || code === 'PADDLE_OCR_UNAVAILABLE') return '文字识别引擎暂时不可用，请检查网络或重试。';
+  return '处理失败，请重试或换一张图片。';
+}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+
+async function buildApprovedVisualProviders() {
+  const item = modelManager.get('general-vision-detr');
+
+  return createDefaultVisualProviders({
+    enableGeneralVision: true,
+    detrOptions: {
+      modelDeliveryManager: modelManager.deliveryManager,
+      modelManifest: item?.manifest || null,
+      offlineOnly: globalThis.navigator?.onLine === false,
+      modelStorageBudgetBytes: Math.max(item?.estimatedDownloadBytes * 1.2 || 64 * 1024 * 1024, 64 * 1024 * 1024),
+      onModelProgress: (e) => {
+        if (e?.type === 'model_file_progress' && e.total) {
+          const pct = Math.min(100, Math.round(e.loaded / e.total * 100));
+          const statusEl = document.querySelector('#status');
+          if (statusEl) {
+            statusEl.textContent = `正在准备视觉模型：${pct}%`;
+          }
+        }
+        if (e?.type === 'model_load_complete') {
+          const statusEl = document.querySelector('#status');
+          if (statusEl) {
+            statusEl.textContent = '视觉模型已准备就绪';
+          }
+          const fileInput = document.querySelector('#file');
+          if (fileInput?.files?.length) {
+            showNotice('视觉模型已准备，正在重新识别...');
+            setTimeout(() => {
+              fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+            }, 500);
+          }
+        }
+        if (e?.type === 'model_load_failed') {
+          showNotice(e.message || '视觉模型加载失败，将使用基础视觉能力');
+        }
+      },
+      loadTimeoutMs: 60000,
+    },
+  });
+}
+
+async function renderModelManager(){
+  if(!modelList)return;
+  const cards=[];
+  for(const item of modelManager.list()){
+    const x=await modelManager.status(item.id);
+    const stateLabel={
+      ready:'已准备 · 离线可用',
+      downloading:'正在下载',
+      retrying:'正在重试',
+      failed:'准备失败',
+      not_installed:'未安装',
+    }[x.state]??x.state;
+    const pct=x.progress?.total&&x.progress.total>0?Math.min(100,Math.round((x.progress.loaded||0)/x.progress.total*100)):0;
+    const size=formatBytes(item.estimatedDownloadBytes);
+    cards.push(`<article class="model-card" data-model-id="${escapeHtml(item.id)}">
+      <div class="model-card-head"><div><h3>${escapeHtml(item.name)}</h3><p>${escapeHtml(item.description)}</p></div><span class="model-state ${x.offlineReady?'model-ready':''}">${escapeHtml(stateLabel)}</span></div>
+      <div class="model-meta"><span>版本 ${escapeHtml(x.version)}</span><span>预计下载 ${escapeHtml(size)}</span><span>${x.offlineReady?'已缓存验证':'不会自动下载'}</span></div>
+      ${(x.state==='downloading'||x.state==='retrying')?`<div class="model-progress"><span style="width:${pct}%"></span></div>`:''}
+      ${x.state==='failed'?`<div class="model-error">${escapeHtml(humanizeModelError(x.progress?.errorCode))}</div>`:''}
+      <div class="model-warning">用于普通照片中的常见物体/场景理解。OCR、语音、条码无需安装它。</div>
+      <div class="model-card-actions">
+        ${x.offlineReady?`<button class="remove" data-model-action="remove" data-model-id="${escapeHtml(item.id)}">删除模型</button>`:`<button class="install" data-model-action="install" data-model-id="${escapeHtml(item.id)}" ${x.state==='downloading'||x.state==='retrying'?'disabled':''}>${x.state==='failed'?'重试准备':'准备视觉模型'}</button>`}
+      </div>
+    </article>`);
+  }
+  modelList.innerHTML=cards.join('');
+  const est=await modelManager.deliveryManager.estimateStorage().catch(()=>({usage:null,quota:null}));
+  modelStorage.textContent=`${formatDeviceProfile(currentDeviceProfile)} · ${formatStorageEstimate(est)}`;
+  modelList.querySelectorAll('[data-model-action]').forEach(btn=>btn.addEventListener('click',()=>handleModelAction(btn.dataset.modelAction,btn.dataset.modelId)));
+}
+async function handleModelAction(action,id){
+  if(action==='install'){
+    const item=modelManager.get(id);if(!item)return;
+    const ok=confirm(`这个视觉 Student 预计需要下载约 ${formatBytes(item.estimatedDownloadBytes)}。下载完成后可离线复用。现在准备吗？`);
+    if(!ok)return;
+    try{
+      await modelManager.install(id,{maxBytes:Math.max(item.estimatedDownloadBytes*1.25,64*1024*1024)});
+      showNotice('视觉模型已经准备好，之后普通图片可以优先本地识别。');
+    }catch(error){
+      showNotice(humanizeModelError(error?.code??error?.message));
+    }
+  }
+  if(action==='remove'){
+    const ok=confirm('删除本地视觉模型？OCR、语音、条码不会受到影响。');
+    if(!ok)return;
+    await modelManager.remove(id);showNotice('视觉模型已删除；需要时可以重新准备。');
+  }
+  await renderModelManager();
+}
+function updateModelDownloadNotice(e){
+  if(e?.type==='model_file_progress'&&e.total){
+    const pct=Math.min(100,Math.round(e.loaded/e.total*100));
+    showNotice(`正在准备视觉模型：${pct}%`);
+  }
+}
+function humanizeModelError(code){
+  const s=String(code||'');
+  if(/MODEL_STORAGE_BUDGET_EXCEEDED/.test(s))return '设备可用存储预算不足，没有继续下载。';
+  if(/MODEL_NOT_AVAILABLE_OFFLINE/.test(s))return '当前离线，而且本地模型还没有准备完整。';
+  if(/MODEL_INTEGRITY_MISMATCH/.test(s))return '模型完整性校验失败，错误文件已经丢弃，请重新准备。';
+  if(/MODEL_HTTP_|fetch|network/i.test(s))return '模型下载失败。OCR、语音等功能仍可继续使用，联网后可重试。';
+  return '视觉模型这次没有准备成功，其他功能不会受影响，可以稍后重试。';
+}
+function formatBytes(n){
+  n=Number(n);if(!Number.isFinite(n)||n<=0)return '未知';
+  if(n>=1024*1024)return `${(n/1024/1024).toFixed(n>=100*1024*1024?0:1)} MB`;
+  if(n>=1024)return `${(n/1024).toFixed(1)} KB`;
+  return `${n} B`;
+}
+
+function formatDeviceProfile(p){
+  const tier={low_power:'轻量设备',balanced:'均衡设备',performance:'高性能设备'}[p?.tier]??'未知设备';
+  const bits=[tier];
+  if(p?.cores)bits.push(`${p.cores} 核`);
+  if(p?.memoryGb)bits.push(`约 ${p.memoryGb} GB 内存`);
+  if(p?.webgpu)bits.push('WebGPU');
+  if(p?.tier==='low_power')bits.push('重型视觉模型将自动降级');
+  return bits.join(' · ');
+}
+
+function formatStorageEstimate(x){
+  const usage=Number(x?.usage),quota=Number(x?.quota);
+  if(Number.isFinite(usage)&&Number.isFinite(quota)&&quota>0)return `浏览器存储：已用 ${formatBytes(usage)} / 可用额度 ${formatBytes(quota)}`;
+  if(Number.isFinite(usage))return `模型缓存占用：${formatBytes(usage)}`;
+  return '浏览器未提供可靠的存储空间估算。';
+}
+
+function safeTaskStateStore(){try{return new LocalStorageTaskStateStore()}catch{return null}}
+async function restorePendingTaskNotice(){
+ if(!taskStateStore)return;
+ try{
+  const items=await taskStateStore.list();if(!items.length)return;
+  const latest=items.sort((a,b)=>String(b.value?.checkpointedAt??'').localeCompare(String(a.value?.checkpointedAt??'')))[0];
+  pendingExecution=await loadExecution(taskStateStore,latest.key,{providers:teacherProviders,searchProvider,consent:false,privacyPolicy:{allowImages:false,allowRawText:false},audit:auditLog});
+  if(!pendingExecution)return;
+  currentPackage=pendingExecution.context.taskPackage;currentObservation=pendingExecution.context.observation;session=createConversationSession({turns:pendingExecution.context.conversation??[]});
+  if(pendingExecution.context.verifiedEntity)setVerifiedEntity(session,pendingExecution.context.verifiedEntity);
+  teacher.hidden=false;teacher.textContent='继续任务';routeBadge.textContent='可继续';routeBadge.dataset.route='teacher';
+  const needsImage=Boolean(currentPackage?.recovery?.mediaOmitted&&currentPackage?.task?.imageRequired);
+  showNotice(needsImage?'发现上次未完成的任务。为保护隐私，图片没有永久保存；重新选择原图后可以从断点继续。':'发现上次未完成的任务，可以从断点继续，不必从头处理。');renderConversation();
+ }catch(error){console.warn('Task recovery unavailable',error)}
+}
+
+function safeAuditLog(){try{return new DurableAuditLog({store:new LocalStorageAuditEventStore()})}catch{return new DurableAuditLog({store:new MemoryAuditEventStore()})}}
+
+function detectUserEnvironment(){
+ const locale=navigator.language??null;
+ let timezone=null;try{timezone=Intl.DateTimeFormat().resolvedOptions().timeZone??null}catch{}
+ // Browser language/timezone are context hints, not proof of jurisdiction or physical location.
+ return {locale,timezone,region:locale?.split('-')?.[1]??null};
+}
