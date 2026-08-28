@@ -1,0 +1,101 @@
+From: SeeMind Architect <architect@seemind.ai>
+Date: 2026-08-27
+Subject: [PATCH] 前端关键修复
+
+---
+ apps/web/src/main.js                 | 19 ++++++++++---------
+ apps/web/src/annotation.js           |  8 ++++++++
+ apps/web/src/pilot-lab-runtime.js    |  4 ++--
+ 3 files changed, 20 insertions(+), 11 deletions(-)
+
+diff --git a/apps/web/src/main.js b/apps/web/src/main.js
+index 1234567..abcdefg 100644
+--- a/apps/web/src/main.js
++++ b/apps/web/src/main.js
+@@ -545,15 +545,16 @@ function fieldRow(label, f, fmt) {
+ }
+ 
+ function formatMoney(v) {
+-  const profile = getLocaleProfile(currentGlobalContext.questionRegion ?? currentGlobalContext.objectRegion ?? currentGlobalContext.userRegion);
+-  const locale = currentGlobalContext.locale ?? profile.defaultLocale ?? navigator.language;
+-  const currency = currentGlobalContext.currency ?? profile.currency ?? 'USD';
++  // 使用明确的默认值，不依赖 navigator.language（可能导致墨西哥用户看到 USD）
++  const profile = getLocaleProfile(currentGlobalContext.questionRegion ?? currentGlobalContext.objectRegion ?? currentGlobalContext.userRegion ?? 'MX');
++  const locale = currentGlobalContext.locale ?? profile.defaultLocale ?? 'es-MX';
++  const currency = currentGlobalContext.currency ?? profile.currency ?? 'MXN';
+   return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(v / 100);
+ }
+ 
+ function formatText(v) { return String(v); }
+ 
+@@ -620,11 +621,11 @@ function resetResult() {
+ }
+ 
+ function humanizeError(e) {
+-  const s = String(e?.message || e);
+-  if (/fetch|network|import/i.test(s)) return 'OCR 引擎首次加载失败。请检查网络后重试；正式离线包将在后续版本内置。';
+-  return '图片读取失败，没有保存任何错误结果。';
++  // 只检查已知的错误代码，不依赖消息文本
++  const code = e?.code || e?.name || '';
++  if (code === 'PERCEPTION_ABORTED' || code === 'IMAGE_DECODE_ABORTED') return '操作已取消。';
++  if (code === 'OCR_ENGINE_UNAVAILABLE' || code === 'PADDLE_OCR_UNAVAILABLE') return '文字识别引擎暂时不可用，请检查网络或重试。';
++  return '处理失败，请重试或换一张图片。';
+ }
+ 
+ function escapeHtml(s) {
+@@ -780,7 +781,7 @@ function restorePendingTaskNotice() {
+ 
+ function safeAuditLog() {
+   try { return new DurableAuditLog({ store: new LocalStorageAuditEventStore() }); }
+-  catch { return new DurableAuditLog({ store: new MemoryAuditEventStore() }); }
++  catch { return new DurableAuditLog({ store: new MemoryAuditEventStore() }); }
+ }
+ 
+ function detectUserEnvironment() {
+diff --git a/apps/web/src/annotation.js b/apps/web/src/annotation.js
+index 2345678..bcdefgh 100644
+--- a/apps/web/src/annotation.js
++++ b/apps/web/src/annotation.js
+@@ -126,8 +126,16 @@ async function loadActive() {
+     render();
+     return;
+   }
++  // 如果 draft 存在但图片不在 volatileFiles 中（页面刷新后）
++  if (item.draft && !f) {
++    imageStatus.textContent = '⚠️ 图片已丢失，请重新选择该图片以继续标注。';
++    // 保留 draft 但显示提示，不重置
++    render();
++    return;
++  }
+   if (!f) {
+-    imageStatus.textContent = '待处理 · 原图片不会写入 LocalStorage';
++    // 没有 draft 也没有图片，重置
++    imageStatus.textContent = '待处理 · 请选择图片开始标注';
+     currentDraft = null;
+     fieldRows.innerHTML = '';
+     renderQueue();
+diff --git a/apps/web/src/pilot-lab-runtime.js b/apps/web/src/pilot-lab-runtime.js
+index 3456789..cdefghi 100644
+--- a/apps/web/src/pilot-lab-runtime.js
++++ b/apps/web/src/pilot-lab-runtime.js
+@@ -25,7 +25,7 @@ export function setupPilotLabRuntime({ ... }) {
+   const pilotLab = new PilotLabController({ storage });
+   const benchmarkAssets = new BenchmarkAssetVault();
+   const pilotLabButton = $('#pilotLabButton'), pilotLabPanel = $('#pilotLabPanel'), ...
+-  const pilotSpeechText = $('#pilotSpeechText');
++  // pilotSpeechText 在 HTML 中不存在，移除引用
+   let pendingPilotAsset = null;
+   ...
+   
+@@ -78,8 +78,8 @@ export function setupPilotLabRuntime({ ... }) {
+     }
+     pilotLab.save();
+     pendingPilotAsset = null;
+     pilotExpected.value = '';
+-    if (pilotSpeechText) pilotSpeechText.value = '';
++    // 不需要清理 pilotSpeechText（已移除）
+     pilotLabMessage.textContent = '已加入。请确认 Ground Truth 是人工核对后的真实答案。';
+     renderPilotLab();
+   });
+-- 
+... 
