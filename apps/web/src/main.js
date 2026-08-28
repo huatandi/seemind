@@ -421,7 +421,14 @@ function renderInitialExplanation(explanation,receipt,decision){
 function renderConversation(){conversation.hidden=session.turns.length===0;conversation.innerHTML=session.turns.slice(-6).map(t=>`<div class="turn ${t.role}">${escapeHtml(t.text)}</div>`).join('')}
 function renderReceipt(r,decision){if(!r){showNotice('没有形成可靠的票据结构。');teacher.hidden=false;return}const rows=[['商户',r.merchant,formatText],['日期',r.date,formatText],['SUBTOTAL',r.subtotal,formatMoney],['IVA',r.tax,formatMoney],['TOTAL',r.total,formatMoney],['EFECTIVO',r.cash,formatMoney],['CAMBIO',r.change,formatMoney]];fields.innerHTML=rows.map(([l,f,fmt])=>fieldRow(l,f,fmt)).join('');const ui=routePresentation(decision);routeBadge.textContent=decision.route==='LOCAL'?'本地完成':ui.label;routeBadge.dataset.route=ui.kind;teacher.hidden=!ui.showTeacher||!teacherProviders.length;const conflicts=r.checks?.filter(c=>c.status==='conflicted')??[];if(conflicts.length){showNotice('票据金额存在矛盾，系统没有自动替你改数字。建议确认原图。');teacher.hidden=false}}
 function fieldRow(label,f,fmt){const unresolved=f?.value==null,value=unresolved?'未识别':fmt(f.value),pct=Math.round((f?.confidence||0)*100);return `<div class="field ${unresolved?'unresolved':''}"><span>${label}</span><strong>${escapeHtml(value)}</strong><small>${unresolved?'':pct+'%'}</small></div>`}
-function formatMoney(v){const profile=getLocaleProfile(currentGlobalContext.questionRegion??currentGlobalContext.objectRegion??currentGlobalContext.userRegion);const locale=currentGlobalContext.locale??profile.defaultLocale??navigator.language;const currency=currentGlobalContext.currency??profile.currency??'USD';return new Intl.NumberFormat(locale,{style:'currency',currency}).format(v/100)} function formatText(v){return String(v)}
+function formatMoney(v) {
+  // 使用明确的默认值，不依赖 navigator.language
+  const profile = getLocaleProfile(currentGlobalContext.questionRegion ?? currentGlobalContext.objectRegion ?? currentGlobalContext.userRegion ?? 'MX');
+  const locale = currentGlobalContext.locale ?? profile.defaultLocale ?? 'es-MX';
+  const currency = currentGlobalContext.currency ?? profile.currency ?? 'MXN';
+  return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(v / 100);
+}
+function formatText(v){return String(v)}
 function updateProgress(m){
  if(m?.progress!=null)progressBar.style.width=`${Math.max(3,Math.min(96,Math.round(m.progress*100)))}%`;
  const stage=String(m?.status??'').toLowerCase(); if(!stage)return;
@@ -436,134 +443,8 @@ function updateProgress(m){
 }
 function resetResult(){pendingExecution=null;pendingVoiceFeedback=null;currentUniversalExplanation=null;if(universalAnswer){universalAnswer.innerHTML='';universalAnswer.hidden=true}fields.innerHTML='';rawText.textContent='';notice.hidden=true;teacher.hidden=true;routeBadge.textContent='';conversation.hidden=true;conversation.innerHTML='';lastAnswer='';currentVisionAttachment=null;speak.hidden=true;session=createConversationSession()}
 function showNotice(text){notice.hidden=false;notice.textContent=text}
-function humanizeError(e){const s=String(e?.message||e);if(/fetch|network|import/i.test(s))return 'OCR 引擎首次加载失败。请检查网络后重试；正式离线包将在后续版本内置。';return '图片读取失败，没有保存任何错误结果。'}
-function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-
-
-
-async function buildApprovedVisualProviders(){
-  const item=modelManager.get('general-vision-detr');
-  const ready=item?await modelManager.isReady(item.id).catch(()=>false):false;
-  if(!ready)return createDefaultVisualProviders({enableGeneralVision:false});
-  return createDefaultVisualProviders({
-    enableGeneralVision:true,
-    detrOptions:{
-      modelDeliveryManager:modelManager.deliveryManager,
-      modelManifest:item.manifest,
-      offlineOnly:globalThis.navigator?.onLine===false,
-      modelStorageBudgetBytes:Math.max(item.estimatedDownloadBytes*1.2,64*1024*1024),
-      onModelProgress:e=>updateModelDownloadNotice(e),
-    },
-  });
-}
-async function renderModelManager(){
-  if(!modelList)return;
-  const cards=[];
-  for(const item of modelManager.list()){
-    const x=await modelManager.status(item.id);
-    const stateLabel={
-      ready:'已准备 · 离线可用',
-      downloading:'正在下载',
-      retrying:'正在重试',
-      failed:'准备失败',
-      not_installed:'未安装',
-    }[x.state]??x.state;
-    const pct=x.progress?.total&&x.progress.total>0?Math.min(100,Math.round((x.progress.loaded||0)/x.progress.total*100)):0;
-    const size=formatBytes(item.estimatedDownloadBytes);
-    cards.push(`<article class="model-card" data-model-id="${escapeHtml(item.id)}">
-      <div class="model-card-head"><div><h3>${escapeHtml(item.name)}</h3><p>${escapeHtml(item.description)}</p></div><span class="model-state ${x.offlineReady?'model-ready':''}">${escapeHtml(stateLabel)}</span></div>
-      <div class="model-meta"><span>版本 ${escapeHtml(x.version)}</span><span>预计下载 ${escapeHtml(size)}</span><span>${x.offlineReady?'已缓存验证':'不会自动下载'}</span></div>
-      ${(x.state==='downloading'||x.state==='retrying')?`<div class="model-progress"><span style="width:${pct}%"></span></div>`:''}
-      ${x.state==='failed'?`<div class="model-error">${escapeHtml(humanizeModelError(x.progress?.errorCode))}</div>`:''}
-      <div class="model-warning">用于普通照片中的常见物体/场景理解。OCR、语音、条码无需安装它。</div>
-      <div class="model-card-actions">
-        ${x.offlineReady?`<button class="remove" data-model-action="remove" data-model-id="${escapeHtml(item.id)}">删除模型</button>`:`<button class="install" data-model-action="install" data-model-id="${escapeHtml(item.id)}" ${x.state==='downloading'||x.state==='retrying'?'disabled':''}>${x.state==='failed'?'重试准备':'准备视觉模型'}</button>`}
-      </div>
-    </article>`);
-  }
-  modelList.innerHTML=cards.join('');
-  const est=await modelManager.deliveryManager.estimateStorage().catch(()=>({usage:null,quota:null}));
-  modelStorage.textContent=`${formatDeviceProfile(currentDeviceProfile)} · ${formatStorageEstimate(est)}`;
-  modelList.querySelectorAll('[data-model-action]').forEach(btn=>btn.addEventListener('click',()=>handleModelAction(btn.dataset.modelAction,btn.dataset.modelId)));
-}
-async function handleModelAction(action,id){
-  if(action==='install'){
-    const item=modelManager.get(id);if(!item)return;
-    const ok=confirm(`这个视觉 Student 预计需要下载约 ${formatBytes(item.estimatedDownloadBytes)}。下载完成后可离线复用。现在准备吗？`);
-    if(!ok)return;
-    try{
-      await modelManager.install(id,{maxBytes:Math.max(item.estimatedDownloadBytes*1.25,64*1024*1024)});
-      showNotice('视觉模型已经准备好，之后普通图片可以优先本地识别。');
-    }catch(error){
-      showNotice(humanizeModelError(error?.code??error?.message));
-    }
-  }
-  if(action==='remove'){
-    const ok=confirm('删除本地视觉模型？OCR、语音、条码不会受到影响。');
-    if(!ok)return;
-    await modelManager.remove(id);showNotice('视觉模型已删除；需要时可以重新准备。');
-  }
-  await renderModelManager();
-}
-function updateModelDownloadNotice(e){
-  if(e?.type==='model_file_progress'&&e.total){
-    const pct=Math.min(100,Math.round(e.loaded/e.total*100));
-    showNotice(`正在准备视觉模型：${pct}%`);
-  }
-}
-function humanizeModelError(code){
-  const s=String(code||'');
-  if(/MODEL_STORAGE_BUDGET_EXCEEDED/.test(s))return '设备可用存储预算不足，没有继续下载。';
-  if(/MODEL_NOT_AVAILABLE_OFFLINE/.test(s))return '当前离线，而且本地模型还没有准备完整。';
-  if(/MODEL_INTEGRITY_MISMATCH/.test(s))return '模型完整性校验失败，错误文件已经丢弃，请重新准备。';
-  if(/MODEL_HTTP_|fetch|network/i.test(s))return '模型下载失败。OCR、语音等功能仍可继续使用，联网后可重试。';
-  return '视觉模型这次没有准备成功，其他功能不会受影响，可以稍后重试。';
-}
-function formatBytes(n){
-  n=Number(n);if(!Number.isFinite(n)||n<=0)return '未知';
-  if(n>=1024*1024)return `${(n/1024/1024).toFixed(n>=100*1024*1024?0:1)} MB`;
-  if(n>=1024)return `${(n/1024).toFixed(1)} KB`;
-  return `${n} B`;
-}
-
-function formatDeviceProfile(p){
-  const tier={low_power:'轻量设备',balanced:'均衡设备',performance:'高性能设备'}[p?.tier]??'未知设备';
-  const bits=[tier];
-  if(p?.cores)bits.push(`${p.cores} 核`);
-  if(p?.memoryGb)bits.push(`约 ${p.memoryGb} GB 内存`);
-  if(p?.webgpu)bits.push('WebGPU');
-  if(p?.tier==='low_power')bits.push('重型视觉模型将自动降级');
-  return bits.join(' · ');
-}
-
-function formatStorageEstimate(x){
-  const usage=Number(x?.usage),quota=Number(x?.quota);
-  if(Number.isFinite(usage)&&Number.isFinite(quota)&&quota>0)return `浏览器存储：已用 ${formatBytes(usage)} / 可用额度 ${formatBytes(quota)}`;
-  if(Number.isFinite(usage))return `模型缓存占用：${formatBytes(usage)}`;
-  return '浏览器未提供可靠的存储空间估算。';
-}
-
-function safeTaskStateStore(){try{return new LocalStorageTaskStateStore()}catch{return null}}
-async function restorePendingTaskNotice(){
- if(!taskStateStore)return;
- try{
-  const items=await taskStateStore.list();if(!items.length)return;
-  const latest=items.sort((a,b)=>String(b.value?.checkpointedAt??'').localeCompare(String(a.value?.checkpointedAt??'')))[0];
-  pendingExecution=await loadExecution(taskStateStore,latest.key,{providers:teacherProviders,searchProvider,consent:false,privacyPolicy:{allowImages:false,allowRawText:false},audit:auditLog});
-  if(!pendingExecution)return;
-  currentPackage=pendingExecution.context.taskPackage;currentObservation=pendingExecution.context.observation;session=createConversationSession({turns:pendingExecution.context.conversation??[]});
-  if(pendingExecution.context.verifiedEntity)setVerifiedEntity(session,pendingExecution.context.verifiedEntity);
-  teacher.hidden=false;teacher.textContent='继续任务';routeBadge.textContent='可继续';routeBadge.dataset.route='teacher';
-  const needsImage=Boolean(currentPackage?.recovery?.mediaOmitted&&currentPackage?.task?.imageRequired);
-  showNotice(needsImage?'发现上次未完成的任务。为保护隐私，图片没有永久保存；重新选择原图后可以从断点继续。':'发现上次未完成的任务，可以从断点继续，不必从头处理。');renderConversation();
- }catch(error){console.warn('Task recovery unavailable',error)}
-}
-
-function safeAuditLog(){try{return new DurableAuditLog({store:new LocalStorageAuditEventStore()})}catch{return new DurableAuditLog({store:new MemoryAuditEventStore()})}}
-
-function detectUserEnvironment(){
- const locale=navigator.language??null;
- let timezone=null;try{timezone=Intl.DateTimeFormat().resolvedOptions().timeZone??null}catch{}
- // Browser language/timezone are context hints, not proof of jurisdiction or physical location.
- return {locale,timezone,region:locale?.split('-')?.[1]??null};
-}
+function humanizeError(e) {
+  // 只检查已知的错误代码，不依赖消息文本
+  const code = e?.code || e?.name || '';
+  if (code === 'PERCEPTION_ABORTED' || code === 'IMAGE_DECODE_ABORTED') return '操作已取消。';
+  if (code
