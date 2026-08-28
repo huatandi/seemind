@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#ffffff">
+  <title>SeeMind</title><link rel="stylesheet" href="/src/styles/app.css">
+</head>
+<body>
+<main class="shell">
+  <section class="hero" id="hero">
+    <button id="eye" class="eye" aria-label="让 SeeMind 看一看"><span class="iris"><span class="pupil"></span></span></button>
+    <h1>SeeMind</h1><p class="tagline">See. Understand. Act.</p>
+    <div class="sense-bar"><label class="capture">看一看<input id="file" type="file" accept="image/*" capture="environment"></label><button id="mic" class="sense" aria-label="和 SeeMind 说话">说一说</button></div>
+    <div id="speechHint" class="speech-hint" hidden></div>
+    <div id="status" class="status" aria-live="polite">等待发现</div><div id="progress" class="progress" hidden><span></span></div>
+    <div class="tool-links"><button id="modelManagerButton" class="model-manager-link" type="button">视觉模型</button><button id="pilotLabButton" class="model-manager-link" type="button">感知实验室</button></div>
+  </section>
+  <section id="modelManagerPanel" class="model-panel" hidden aria-labelledby="modelManagerTitle">
+    <div class="model-panel-head"><div><strong id="modelManagerTitle">本地视觉模型</strong><p>只在你允许后准备。已安装后可离线使用。</p></div><button id="modelManagerClose" type="button" aria-label="关闭">×</button></div>
+    <div id="modelList" class="model-list"></div>
+    <div id="modelStorage" class="model-storage"></div>
+  </section>
+  <section id="pilotLabPanel" class="model-panel lab-panel" hidden aria-labelledby="pilotLabTitle">
+    <div class="model-panel-head"><div><strong id="pilotLabTitle">VISION / VOICE Pilot Lab</strong><p>收集真实案例、人工确认答案，再用于引擎赛马。实验室不会把未标注素材当成准确率证据。</p></div><button id="pilotLabClose" type="button" aria-label="关闭">×</button></div>
+    <div id="pilotLabStats" class="lab-stats"></div>
+    <div class="lab-form">
+      <select id="pilotModality"><option value="vision">图片</option><option value="voice">语音</option><option value="multimodal">图片 + 语音</option></select>
+      <select id="pilotCategory"></select>
+      <label class="lab-file">选择真实素材<input id="pilotAssetFile" type="file" accept="image/*"></label><div id="pilotAssetName" class="lab-asset-name">尚未选择素材</div>
+      <input id="pilotExpected" type="text" placeholder="人工确认的正确答案">
+      <input id="pilotLanguage" type="text" placeholder="语言，例如 zh-CN / es-MX / auto" value="auto">
+      <button id="pilotAdd" class="primary" type="button">加入测试集</button>
+    </div>
+    <div id="pilotLabMessage" class="lab-message"></div>
+    <div id="pilotCaseList" class="lab-case-list"></div>
+    <div class="lab-actions"><button id="pilotExport" type="button">导出 JSON</button><label>导入 JSON<input id="pilotImport" type="file" accept=".json,application/json"></label></div>
+    <div class="lab-benchmark">
+      <div class="lab-benchmark-head"><strong>真实引擎赛马</strong><small>只运行本机当前真正可用的引擎</small></div>
+      <div class="lab-candidates"><label><input id="pilotSmolVlm" type="checkbox"> 加入 SmolVLM 256M 实验候选</label><small>首次运行可能下载约 190MB 模型；仅用于 Lab，不会自动成为默认视觉引擎。</small></div>
+      <div class="lab-candidates"><label><input id="pilotWhisperTiny" type="checkbox"> 加入 Whisper Tiny 多语种语音候选</label><small>用于真实音频文件赛马；支持中/西/英等多语种。首次运行需下载模型，仅用于 Voice Lab，不替代实时 WebSpeech。</small></div>
+      <div class="lab-candidates"><label><input id="pilotMoonshine" type="checkbox"> 加入 Moonshine Base 英语低延迟候选</label><small>仅参加英语 Voice League；不会用于中文/西语。首次运行需下载模型，仅用于 Lab。</small></div>
+      <div class="lab-candidates"><label><input id="pilotSherpa" type="checkbox"> 加入 Sherpa-ONNX WASM 中英语音候选</label><small>仅当本机已安装兼容 Sherpa WASM runtime + 模型时参加；本版本不伪装已内置模型，也不会自动下载未知模型。</small></div>
+      <div class="lab-run-buttons"><button id="pilotRunVision" class="primary" type="button">运行 Vision Benchmark</button><button id="pilotRunVoice" class="secondary" type="button">运行 Voice Benchmark</button></div>
+      <button id="pilotRunMultimodal" class="secondary lab-mm-run" type="button">运行 Multimodal Benchmark</button>
+      <div id="pilotRunProgress" class="lab-message"></div>
+      <div id="pilotBenchmarkResults" class="lab-benchmark-results"></div>
+    </div>
+  </section>
+  <section id="result" class="result" hidden>
+    <img id="preview" alt="已选择的图片">
+    <div class="answer-card">
+      <div class="answer-head"><strong id="answerTitle">识别结果</strong><span id="routeBadge" class="badge"></span></div>
+      <div id="universalAnswer" class="universal-answer" hidden></div><div id="fields" class="fields"></div><div id="notice" class="notice" hidden></div>
+      <div id="conversation" class="conversation" hidden></div>
+      <div class="ask-row"><input id="question" type="text" placeholder="看着它，问一句…" autocomplete="off"><button id="ask" aria-label="提问">↑</button></div>
+      <div class="actions"><button id="again" class="secondary">再看一张</button><button id="speak" class="secondary" hidden>读给我听</button><button id="teacher" class="primary" hidden>问老师</button></div>
+    </div>
+    <details class="details"><summary>识别原文</summary><pre id="rawText"></pre></details>
+  </section>
+</main><script type="module" src="/src/main.js"></script>
+</body></html>

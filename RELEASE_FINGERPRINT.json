@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "release": "SeeMind-v0.70.0",
+  "version": "0.70.0",
+  "architectureFrozen": true,
+  "expectedRegressionTests": 883,
+  "criticalFiles": {
+    "package.json": "8321ee46ea6511c11c1bff71ad46024f7847f4bc540af1796ff556f74eae9294",
+    "apps/web/src/main.js": "d8b8ed57ecff96102fe9150f6b848051edffd82aba22c0ecead5af463f4ecd64",
+    "apps/web/src/runtime/pilot-lab-runtime.js": "b0062fc43623fa570d036d8d232e2af432373d9fd6e00bacb9c9608f32ebf500",
+    "core/perception/perception-boundary.js": "f0566afe8bc41827b4bcee0bf04d1de82d2be8f025c832f99c9350d0899658f0",
+    "core/resolution/problem-understanding.js": "aecdfc193fcd3292a82f75e040c70fe1e17f3bbc64dae380daa67a14e4b6e775",
+    "core/orchestration/unified-orchestrator.js": "dd8027fba72f0d2f8ecee7fafcb093024c00fd315f73d9a9395222ec1eba5978",
+    "core/orchestration/intelligence-gap-router.js": "2164bc9f9df68b2f12361a083556df32e0c46feab02cc972bfa1ac0e8731df29",
+    "core/teacher/teacher-router.js": "19b2b090b9646d01ff0bb30f8e70f1f220e1036be8b91e7bf714903b8138a3b2",
+    "core/verification/verification-core.js": "9ec6ad92bd5a5d2751ee6e33513abb006e606140ccdd6d7ff26e2558f9275034"
+  }
+}

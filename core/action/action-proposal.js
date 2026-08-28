@@ -1,0 +1,1 @@
+export function createActionProposal(type,payload,sourceTaskId){return {schemaVersion:1,id:crypto.randomUUID(),idempotencyKey:crypto.randomUUID(),type,payload,riskLevel:'low',requiresConfirmation:true,sourceTaskId,evidenceIds:[],status:'proposed',createdAt:new Date().toISOString()}}

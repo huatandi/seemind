@@ -1,0 +1,23 @@
+{
+  "release": "SeeMind-v0.70.0",
+  "regression": {
+    "tests": 883,
+    "passed": 883,
+    "failed": 0
+  },
+  "releaseIntegrity": true,
+  "relativeImports": {
+    "checked": 856,
+    "missing": 0
+  },
+  "productionCircularScc": 0,
+  "hardcodedSecretHits": 0,
+  "coreProviderBrandRoutingHits": 0,
+  "mainJsLines": 556,
+  "coreFiles": 191,
+  "coreLines": 10140,
+  "buildVerifiedInThisEnvironment": false,
+  "buildLimitation": "Vite dev dependency is not installed in the audit container; npm dependency installation timed out.",
+  "fieldTestReady": true,
+  "productionReleaseReady": false
+}

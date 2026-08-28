@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#ffffff">
+  <title>SeeMind · 标注复核</title>
+  <link rel="stylesheet" href="/src/styles/annotation.css">
+</head>
+<body>
+<main class="review-shell">
+  <header class="topbar">
+    <div><strong>SeeMind</strong><span>视力考试库</span></div>
+    <a href="/">返回</a>
+  </header>
+
+  <section id="empty" class="empty">
+    <label class="import">
+      <span class="eye-mini"><i></i></span>
+      <strong>导入票据</strong>
+      <small>可一次选择多张。Student 会逐张预填；关闭页面后标注进度仍会保留。</small>
+      <input id="file" type="file" accept="image/*" multiple>
+    </label>
+    <button id="resumeBatch" class="resume" hidden>继续上次标注</button>
+  </section>
+
+  <section id="workspace" class="workspace" hidden>
+    <aside class="queue-pane">
+      <div class="queue-head">
+        <strong>票据队列</strong><span id="queueCount">0</span>
+      </div>
+      <div class="queue-filters">
+        <button data-filter="all" class="active">全部</button>
+        <button data-filter="annotation">待标注</button>
+        <button data-filter="review">待复核</button>
+        <button data-filter="eligible">已通过</button>
+      </div>
+      <div id="queueList" class="queue-list"></div>
+    </aside>
+    <div class="image-pane">
+      <img id="preview" alt="待标注票据">
+      <div id="imageStatus" class="image-status">正在读取…</div>
+    </div>
+
+    <div class="editor-pane">
+      <div class="mode-head">
+        <div>
+          <strong id="modeTitle">人工标注</strong>
+          <small id="caseId"></small>
+        </div>
+        <span id="stageBadge" class="stage">ANNOTATION</span>
+      </div>
+
+      <div id="fieldRows" class="field-rows"></div>
+
+      <details class="privacy">
+        <summary>隐私与来源</summary>
+        <div class="privacy-body">
+          <label>标注员 <input id="annotatorId" value="annotator-1"></label>
+          <label>复核员 <input id="reviewerId" value="reviewer-1"></label>
+          <label class="check"><input id="consent" type="checkbox"> 已确认这张票据可用于本地测试库</label>
+          <label class="check"><input id="redacted" type="checkbox"> 已人工确认图片中的个人敏感信息已遮挡/不存在</label>
+          <div id="privacyWarning" class="warning" hidden></div>
+        </div>
+      </details>
+
+      <div id="progressText" class="progress-text"></div>
+      <div id="message" class="message" hidden></div>
+
+      <div class="queue-nav">
+        <button id="prevReceipt" class="secondary">上一张</button>
+        <button id="skipReceipt" class="secondary">跳过</button>
+        <button id="nextReceipt" class="secondary">下一张</button>
+      </div>
+      <div id="annotatorActions" class="bottom-actions">
+        <button id="newReceipt" class="secondary">继续导入</button>
+        <button id="submitReview" class="primary">提交复核</button>
+      </div>
+
+      <div id="reviewActions" class="bottom-actions" hidden>
+        <button id="rejectReview" class="secondary danger">退回修改</button>
+        <button id="approveReview" class="primary">确认进入测试库</button>
+      </div>
+
+      <div id="eligibleActions" class="bottom-actions" hidden>
+        <button id="downloadJson" class="primary">导出 Ground Truth JSON</button>
+      </div>
+    </div>
+  </section>
+</main>
+<script type="module" src="/src/annotation.js"></script>
+</body>
+</html>

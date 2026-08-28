@@ -1,0 +1,4 @@
+# Install versions compatible with your CPU/GPU and OS.
+# See PaddleOCR/PaddlePaddle official installation guidance before production pinning.
+paddleocr
+paddlepaddle

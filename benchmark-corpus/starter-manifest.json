@@ -1,0 +1,147 @@
+{
+  "schemaVersion": 1,
+  "id": "seemind-world-v1",
+  "description": "Starter manifest; replace assetRef placeholders with real local test assets.",
+  "cases": [
+    {
+      "id": "vision-everyday-001",
+      "modality": "vision",
+      "assetRef": "ADD_REAL_ASSET",
+      "category": "everyday_objects",
+      "language": "auto",
+      "expected": {
+        "labels": []
+      },
+      "conditions": {},
+      "tags": [
+        "placeholder"
+      ]
+    },
+    {
+      "id": "vision-plant-001",
+      "modality": "vision",
+      "assetRef": "ADD_REAL_ASSET",
+      "category": "plants_animals",
+      "language": "auto",
+      "expected": {
+        "labels": []
+      },
+      "conditions": {},
+      "tags": [
+        "placeholder"
+      ]
+    },
+    {
+      "id": "vision-device-001",
+      "modality": "vision",
+      "assetRef": "ADD_REAL_ASSET",
+      "category": "devices_components",
+      "language": "auto",
+      "expected": {
+        "labels": []
+      },
+      "conditions": {},
+      "tags": [
+        "placeholder"
+      ]
+    },
+    {
+      "id": "vision-product-001",
+      "modality": "vision",
+      "assetRef": "ADD_REAL_ASSET",
+      "category": "products_models",
+      "language": "auto",
+      "expected": {
+        "labels": []
+      },
+      "conditions": {},
+      "tags": [
+        "placeholder"
+      ]
+    },
+    {
+      "id": "vision-scene-001",
+      "modality": "vision",
+      "assetRef": "ADD_REAL_ASSET",
+      "category": "scenes_places",
+      "language": "auto",
+      "expected": {
+        "labels": []
+      },
+      "conditions": {},
+      "tags": [
+        "placeholder"
+      ]
+    },
+    {
+      "id": "vision-anomaly-001",
+      "modality": "vision",
+      "assetRef": "ADD_REAL_ASSET",
+      "category": "anomaly_visual",
+      "language": "auto",
+      "expected": {
+        "labels": []
+      },
+      "conditions": {},
+      "tags": [
+        "placeholder"
+      ]
+    },
+    {
+      "id": "vision-receipt-001",
+      "modality": "vision",
+      "assetRef": "ADD_REAL_ASSET",
+      "category": "documents_receipts",
+      "language": "es",
+      "expected": {
+        "labels": []
+      },
+      "conditions": {},
+      "tags": [
+        "placeholder"
+      ]
+    },
+    {
+      "id": "voice-es-001",
+      "modality": "voice",
+      "assetRef": "ADD_REAL_ASSET",
+      "language": "es-MX",
+      "expected": {
+        "text": "ADD_TRANSCRIPT"
+      },
+      "conditions": {},
+      "tags": [
+        "placeholder"
+      ]
+    },
+    {
+      "id": "voice-zh-001",
+      "modality": "voice",
+      "assetRef": "ADD_REAL_ASSET",
+      "language": "zh-CN",
+      "expected": {
+        "text": "ADD_TRANSCRIPT"
+      },
+      "conditions": {},
+      "tags": [
+        "placeholder"
+      ]
+    },
+    {
+      "id": "multimodal-reference-001",
+      "modality": "multimodal",
+      "assetRef": "ADD_REAL_IMAGE_AND_AUDIO",
+      "language": "auto",
+      "expected": {
+        "intent": "explain",
+        "reference": "ADD_REFERENCE",
+        "target": "ADD_TARGET",
+        "stateOrProblem": "ADD_STATE"
+      },
+      "conditions": {},
+      "tags": [
+        "placeholder"
+      ]
+    }
+  ]
+}

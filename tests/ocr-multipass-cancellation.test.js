@@ -1,0 +1,3 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {runMultiPassOcr} from '../core/ocr/multi-pass-ocr.js';
+test('multi-pass OCR propagates cancellation into engine recognition',async()=>{const c=new AbortController();let gotSignal=false;const engine={id:'x',providerType:'local',recognize:async(_i,o)=>{gotSignal=o.signal===c.signal;return new Promise(()=>{})}};const p=runMultiPassOcr({candidates:[{ocrInput:{},planId:'p'}],ocrEngine:engine,signal:c.signal,perRecognitionTimeoutMs:5000});setTimeout(()=>c.abort(),10);await assert.rejects(p,e=>e.code==='OCR_ABORTED');assert.equal(gotSignal,true)});
