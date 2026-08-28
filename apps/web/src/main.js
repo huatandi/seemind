@@ -122,9 +122,66 @@ function normalizeFeedbackText(v){return String(v??'').normalize('NFKC').toLower
 function safeLocalStorage(){try{const k='__seemind_lab_probe__';localStorage.setItem(k,'1');localStorage.removeItem(k);return localStorage}catch{return null}}
 
 async function buildApprovedVisualProviders() {
+  // 如果模型已经在内存中，直接使用
+  if (window.__detector) {
+    console.log('🧠 使用内存中的 DETR 模型');
+    return [
+      {
+        id: 'detr-injected',
+        getProfile: () => ({
+          capabilities: [
+            { capability: 'object_identity', score: 0.85 },
+            { capability: 'scene_context', score: 0.60 }
+          ],
+          priority: 100,
+          deviceClasses: ['balanced', 'performance'],
+          estimatedMemoryMb: 220,
+          estimatedLatencyMs: 2000,
+          privacyModes: ['local'],
+          reliability: 0.9
+        }),
+        analyze: async (image, { capabilities = [] } = {}) => {
+          console.log('🧠 DETR 分析图片...');
+          const previewEl = document.querySelector('#preview');
+          if (!previewEl || !previewEl.src) {
+            return { identity: [], scene: [], regions: [], confidence: 0 };
+          }
+          try {
+            const result = await window.__detector(previewEl.src, { threshold: 0.5 });
+            console.log('DETR 结果:', result);
+            if (result && result.length > 0) {
+              const labels = result.map(d => d.label);
+              const uniqueLabels = labels.filter((v, i) => labels.indexOf(v) === i);
+              return {
+                identity: uniqueLabels.map(label => ({
+                  label: label,
+                  confidence: result.find(d => d.label === label)?.score || 0.8,
+                  status: 'observed'
+                })),
+                scene: [],
+                regions: result.map((d, i) => ({
+                  id: `detected-${i}`,
+                  regionType: 'object',
+                  objectType: d.label,
+                  confidence: d.score,
+                  bbox: { x: d.box.xmin, y: d.box.ymin, width: d.box.xmax - d.box.xmin, height: d.box.ymax - d.box.ymin }
+                })),
+                confidence: result.length > 0 ? Math.max(...result.map(d => d.score)) : 0
+              };
+            }
+          } catch (error) {
+            console.error('DETR 分析失败:', error.message);
+          }
+          return { identity: [], scene: [], regions: [], confidence: 0 };
+        },
+        load: async () => {},
+        unload: async () => {}
+      }
+    ];
+  }
+
+  // 原有逻辑（当模型未加载时）
   const item = modelManager.get('general-vision-detr');
-  
-  // 始终启用 General Vision，让 TransformersDetrProvider 内部处理下载
   return createDefaultVisualProviders({
     enableGeneralVision: true,
     detrOptions: {
@@ -462,7 +519,6 @@ function renderConversation(){conversation.hidden=session.turns.length===0;conve
 function renderReceipt(r,decision){if(!r){showNotice('没有形成可靠的票据结构。');teacher.hidden=false;return}const rows=[['商户',r.merchant,formatText],['日期',r.date,formatText],['SUBTOTAL',r.subtotal,formatMoney],['IVA',r.tax,formatMoney],['TOTAL',r.total,formatMoney],['EFECTIVO',r.cash,formatMoney],['CAMBIO',r.change,formatMoney]];fields.innerHTML=rows.map(([l,f,fmt])=>fieldRow(l,f,fmt)).join('');const ui=routePresentation(decision);routeBadge.textContent=decision.route==='LOCAL'?'本地完成':ui.label;routeBadge.dataset.route=ui.kind;teacher.hidden=!ui.showTeacher||!teacherProviders.length;const conflicts=r.checks?.filter(c=>c.status==='conflicted')??[];if(conflicts.length){showNotice('票据金额存在矛盾，系统没有自动替你改数字。建议确认原图。');teacher.hidden=false}}
 function fieldRow(label,f,fmt){const unresolved=f?.value==null,value=unresolved?'未识别':fmt(f.value),pct=Math.round((f?.confidence||0)*100);return `<div class="field ${unresolved?'unresolved':''}"><span>${label}</span><strong>${escapeHtml(value)}</strong><small>${unresolved?'':pct+'%'}</small></div>`}
 function formatMoney(v) {
-  // 使用明确的默认值，不依赖 navigator.language
   const profile = getLocaleProfile(currentGlobalContext.questionRegion ?? currentGlobalContext.objectRegion ?? currentGlobalContext.userRegion ?? 'MX');
   const locale = currentGlobalContext.locale ?? profile.defaultLocale ?? 'es-MX';
   const currency = currentGlobalContext.currency ?? profile.currency ?? 'MXN';
@@ -484,53 +540,12 @@ function updateProgress(m){
 function resetResult(){pendingExecution=null;pendingVoiceFeedback=null;currentUniversalExplanation=null;if(universalAnswer){universalAnswer.innerHTML='';universalAnswer.hidden=true}fields.innerHTML='';rawText.textContent='';notice.hidden=true;teacher.hidden=true;routeBadge.textContent='';conversation.hidden=true;conversation.innerHTML='';lastAnswer='';currentVisionAttachment=null;speak.hidden=true;session=createConversationSession()}
 function showNotice(text){notice.hidden=false;notice.textContent=text}
 function humanizeError(e) {
-  // 只检查已知的错误代码，不依赖消息文本
   const code = e?.code || e?.name || '';
   if (code === 'PERCEPTION_ABORTED' || code === 'IMAGE_DECODE_ABORTED') return '操作已取消。';
   if (code === 'OCR_ENGINE_UNAVAILABLE' || code === 'PADDLE_OCR_UNAVAILABLE') return '文字识别引擎暂时不可用，请检查网络或重试。';
   return '处理失败，请重试或换一张图片。';
 }
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-
-async function buildApprovedVisualProviders() {
-  const item = modelManager.get('general-vision-detr');
-
-  return createDefaultVisualProviders({
-    enableGeneralVision: true,
-    detrOptions: {
-      modelDeliveryManager: modelManager.deliveryManager,
-      modelManifest: item?.manifest || null,
-      offlineOnly: globalThis.navigator?.onLine === false,
-      modelStorageBudgetBytes: Math.max(item?.estimatedDownloadBytes * 1.2 || 64 * 1024 * 1024, 64 * 1024 * 1024),
-      onModelProgress: (e) => {
-        if (e?.type === 'model_file_progress' && e.total) {
-          const pct = Math.min(100, Math.round(e.loaded / e.total * 100));
-          const statusEl = document.querySelector('#status');
-          if (statusEl) {
-            statusEl.textContent = `正在准备视觉模型：${pct}%`;
-          }
-        }
-        if (e?.type === 'model_load_complete') {
-          const statusEl = document.querySelector('#status');
-          if (statusEl) {
-            statusEl.textContent = '视觉模型已准备就绪';
-          }
-          const fileInput = document.querySelector('#file');
-          if (fileInput?.files?.length) {
-            showNotice('视觉模型已准备，正在重新识别...');
-            setTimeout(() => {
-              fileInput.dispatchEvent(new Event('change', { bubbles: true }));
-            }, 500);
-          }
-        }
-        if (e?.type === 'model_load_failed') {
-          showNotice(e.message || '视觉模型加载失败，将使用基础视觉能力');
-        }
-      },
-      loadTimeoutMs: 60000,
-    },
-  });
-}
 
 async function renderModelManager(){
   if(!modelList)return;
@@ -640,6 +655,5 @@ function safeAuditLog(){try{return new DurableAuditLog({store:new LocalStorageAu
 function detectUserEnvironment(){
  const locale=navigator.language??null;
  let timezone=null;try{timezone=Intl.DateTimeFormat().resolvedOptions().timeZone??null}catch{}
- // Browser language/timezone are context hints, not proof of jurisdiction or physical location.
  return {locale,timezone,region:locale?.split('-')?.[1]??null};
 }
