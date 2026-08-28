@@ -122,65 +122,56 @@ function normalizeFeedbackText(v){return String(v??'').normalize('NFKC').toLower
 function safeLocalStorage(){try{const k='__seemind_lab_probe__';localStorage.setItem(k,'1');localStorage.removeItem(k);return localStorage}catch{return null}}
 
 async function buildApprovedVisualProviders() {
-  // 如果模型已经在内存中，直接使用
-  if (window.__detector) {
-    console.log('🧠 使用内存中的 DETR 模型');
-    return [
-      {
-        id: 'detr-injected',
-        getProfile: () => ({
-          capabilities: [
-            { capability: 'object_identity', score: 0.85 },
-            { capability: 'scene_context', score: 0.60 }
-          ],
-          priority: 100,
-          deviceClasses: ['balanced', 'performance'],
-          estimatedMemoryMb: 220,
-          estimatedLatencyMs: 2000,
-          privacyModes: ['local'],
-          reliability: 0.9
-        }),
-        analyze: async (image, { capabilities = [] } = {}) => {
-          console.log('🧠 DETR 分析图片...');
-          const previewEl = document.querySelector('#preview');
-          if (!previewEl || !previewEl.src) {
-            return { identity: [], scene: [], regions: [], confidence: 0 };
+  // 检测全局内存中是否有模型
+  if (typeof window !== 'undefined' && window.__detector) {
+    console.log('🧠 使用内存中的 DETR 模型 (main.js)');
+    return [{
+      id: 'detr-injected',
+      getProfile: () => ({
+        capabilities: [{ capability: 'object_identity', score: 0.85 }],
+        priority: 100,
+        deviceClasses: ['balanced', 'performance'],
+        estimatedMemoryMb: 220,
+        estimatedLatencyMs: 2000,
+        privacyModes: ['local'],
+        reliability: 0.9
+      }),
+      analyze: async (image, { capabilities = [] } = {}) => {
+        console.log('🧠 DETR 分析图片 (main.js)');
+        const previewEl = document.querySelector('#preview');
+        if (!previewEl?.src) return { identity: [], regions: [], confidence: 0 };
+        try {
+          const result = await window.__detector(previewEl.src, { threshold: 0.5 });
+          console.log('DETR 结果:', result);
+          if (result && result.length > 0) {
+            const labels = result.map(d => d.label);
+            const uniqueLabels = labels.filter((v, i) => labels.indexOf(v) === i);
+            return {
+              identity: uniqueLabels.map(label => ({
+                label: label,
+                confidence: result.find(d => d.label === label)?.score || 0.8,
+                status: 'observed'
+              })),
+              regions: result.map((d, i) => ({
+                id: `detected-${i}`,
+                regionType: 'object',
+                objectType: d.label,
+                confidence: d.score,
+                bbox: { x: d.box.xmin, y: d.box.ymin, width: d.box.xmax - d.box.xmin, height: d.box.ymax - d.box.ymin }
+              })),
+              confidence: result.length > 0 ? Math.max(...result.map(d => d.score)) : 0
+            };
           }
-          try {
-            const result = await window.__detector(previewEl.src, { threshold: 0.5 });
-            console.log('DETR 结果:', result);
-            if (result && result.length > 0) {
-              const labels = result.map(d => d.label);
-              const uniqueLabels = labels.filter((v, i) => labels.indexOf(v) === i);
-              return {
-                identity: uniqueLabels.map(label => ({
-                  label: label,
-                  confidence: result.find(d => d.label === label)?.score || 0.8,
-                  status: 'observed'
-                })),
-                scene: [],
-                regions: result.map((d, i) => ({
-                  id: `detected-${i}`,
-                  regionType: 'object',
-                  objectType: d.label,
-                  confidence: d.score,
-                  bbox: { x: d.box.xmin, y: d.box.ymin, width: d.box.xmax - d.box.xmin, height: d.box.ymax - d.box.ymin }
-                })),
-                confidence: result.length > 0 ? Math.max(...result.map(d => d.score)) : 0
-              };
-            }
-          } catch (error) {
-            console.error('DETR 分析失败:', error.message);
-          }
-          return { identity: [], scene: [], regions: [], confidence: 0 };
-        },
-        load: async () => {},
-        unload: async () => {}
-      }
-    ];
+        } catch (error) {
+          console.error('DETR 分析失败:', error.message);
+        }
+        return { identity: [], regions: [], confidence: 0 };
+      },
+      load: async () => {},
+      unload: async () => {}
+    }];
   }
-
-  // 原有逻辑（当模型未加载时）
+  // 回退到原逻辑
   const item = modelManager.get('general-vision-detr');
   return createDefaultVisualProviders({
     enableGeneralVision: true,
@@ -196,22 +187,6 @@ async function buildApprovedVisualProviders() {
           if (statusEl) {
             statusEl.textContent = `正在准备视觉模型：${pct}%`;
           }
-        }
-        if (e?.type === 'model_load_complete') {
-          const statusEl = document.querySelector('#status');
-          if (statusEl) {
-            statusEl.textContent = '视觉模型已准备就绪';
-          }
-          const fileInput = document.querySelector('#file');
-          if (fileInput?.files?.length) {
-            showNotice('视觉模型已准备，正在重新识别...');
-            setTimeout(() => {
-              fileInput.dispatchEvent(new Event('change', { bubbles: true }));
-            }, 500);
-          }
-        }
-        if (e?.type === 'model_load_failed') {
-          showNotice(e.message || '视觉模型加载失败，将使用基础视觉能力');
         }
       },
       loadTimeoutMs: 60000,
